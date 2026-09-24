@@ -1,24 +1,22 @@
 #include "main.h"
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 
 UART_HandleTypeDef huart1;
 I2C_HandleTypeDef hi2c1;
-SPI_HandleTypeDef hspi1;
 
 #define MPU6050_ADDR          (0x68 << 1)
 #define MPU6050_PWR_MGMT_1   0x6B
 #define MPU6050_ACCEL_XOUT_H 0x3B
 
-#define MAX7219_CS_LOW()  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET)
-#define MAX7219_CS_HIGH() HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET)
-
 int16_t accel_x;
 int16_t accel_y;
 int16_t accel_z;
-
-uint8_t accel_data[6];
+int16_t gyr_x;
+int16_t gyr_y;
+int16_t gyr_z;
+int16_t temperature;
+uint8_t accel_data[14];
 
 char uart_buffer[100];
 
@@ -27,7 +25,9 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_I2C1_Init(void);
-static void MX_SPI1_Init(void);
+
+
+
 
 void UART_SendString(char *str)
 {
@@ -40,7 +40,7 @@ void UART_SendString(char *str)
 }
 
 
-/* ================= MPU6050 ================= */
+
 
 uint8_t MPU6050_Init(void)
 {
@@ -57,6 +57,7 @@ uint8_t MPU6050_Init(void)
     ) == HAL_OK;
 }
 
+
 uint8_t MPU6050_Read_Accel(void)
 {
     if (HAL_I2C_Mem_Read(
@@ -65,7 +66,7 @@ uint8_t MPU6050_Read_Accel(void)
             MPU6050_ACCEL_XOUT_H,
             I2C_MEMADD_SIZE_8BIT,
             accel_data,
-            6,
+            14,
             100) != HAL_OK)
     {
         return 0;
@@ -74,96 +75,15 @@ uint8_t MPU6050_Read_Accel(void)
     accel_x = (int16_t)((accel_data[0] << 8) | accel_data[1]);
     accel_y = (int16_t)((accel_data[2] << 8) | accel_data[3]);
     accel_z = (int16_t)((accel_data[4] << 8) | accel_data[5]);
+    gyr_x = (int16_t)((accel_data[8] << 8) | accel_data[9]);
+    gyr_y = (int16_t)((accel_data[10] << 8) | accel_data[11]);
+    gyr_z = (int16_t)((accel_data[12] << 8) | accel_data[13]);
+    temperature = (int16_t)((accel_data[6] << 8) | accel_data[7]);
 
     return 1;
 }
 
 
-/* ================= MAX7219 ================= */
-
-void MAX7219_Write(uint8_t address, uint8_t data)
-{
-    uint8_t tx[2];
-
-    tx[0] = address;
-    tx[1] = data;
-
-    MAX7219_CS_LOW();
-
-    HAL_SPI_Transmit(
-        &hspi1,
-        tx,
-        2,
-        100
-    );
-
-    MAX7219_CS_HIGH();
-}
-
-void MAX7219_Init(void)
-{
-    MAX7219_Write(0x0F, 0x00);
-    MAX7219_Write(0x0C, 0x01);
-    MAX7219_Write(0x0B, 0x07);
-    MAX7219_Write(0x09, 0xFF);
-    MAX7219_Write(0x0A, 0x08);
-
-    MAX7219_Write(0x01, 0);
-    MAX7219_Write(0x02, 0);
-    MAX7219_Write(0x03, 0);
-    MAX7219_Write(0x04, 0);
-    MAX7219_Write(0x05, 0);
-    MAX7219_Write(0x06, 0);
-    MAX7219_Write(0x07, 0);
-    MAX7219_Write(0x08, 0);
-}
-
-
-/* Hiển thị số nguyên trên MAX7219 */
-
-void MAX7219_DisplayNumber(int32_t number)
-{
-    uint8_t digit;
-    uint8_t i;
-
-    if (number < 0)
-    {
-        number = -number;
-
-        MAX7219_Write(0x01, 0x0A);
-
-        for (i = 2; i <= 8; i++)
-        {
-            digit = number % 10;
-            number /= 10;
-
-            MAX7219_Write(i, digit);
-
-            if (number == 0)
-                break;
-        }
-
-        return;
-    }
-
-    for (i = 1; i <= 8; i++)
-    {
-        if (number > 0)
-        {
-            digit = number % 10;
-            number /= 10;
-
-            MAX7219_Write(i, digit);
-        }
-        else
-        {
-            MAX7219_Write(i, 0x0F);
-        }
-    }
-}
-
-
-/* ================= MAIN ================= */
 
 int main(void)
 {
@@ -174,15 +94,6 @@ int main(void)
     MX_GPIO_Init();
     MX_USART1_UART_Init();
     MX_I2C1_Init();
-    MX_SPI1_Init();
-
-    HAL_GPIO_WritePin(
-        GPIOA,
-        GPIO_PIN_4,
-        GPIO_PIN_SET
-    );
-
-    MAX7219_Init();
 
     UART_SendString("\r\n");
     UART_SendString("SYSTEM START\r\n");
@@ -204,28 +115,21 @@ int main(void)
         {
             sprintf(
                 uart_buffer,
-                "ACC X=%d Y=%d Z=%d\r\n",
-                accel_x,
-                accel_y,
-                accel_z
+                "ACC: X=%d Y=%d Z=%d GYR:X=%d Y=%d Z=%d temp:%d\r\n",
+                (int)((accel_x/16384.0f)*10),
+                (int)((accel_y/16384.0f)*10),
+                (int)((accel_z/16384.0f)*10),
+                (int)((gyr_x/131.0f)*(3.14f/180.0f)),
+                (int)((gyr_y/131.0f)*(3.14f/180.0f)),
+                (int)((gyr_z/131.0f)*(3.14f/180.0f)),
+                (int)((temperature/340.0f)+36.53f)
             );
 
             UART_SendString(uart_buffer);
-
-            MAX7219_DisplayNumber(accel_x);
         }
         else
         {
             UART_SendString("I2C READ ERROR\r\n");
-
-            MAX7219_Write(0x01, 0x0E);
-            MAX7219_Write(0x02, 0x0E);
-            MAX7219_Write(0x03, 0x0E);
-            MAX7219_Write(0x04, 0x0E);
-            MAX7219_Write(0x05, 0x0E);
-            MAX7219_Write(0x06, 0x0E);
-            MAX7219_Write(0x07, 0x0E);
-            MAX7219_Write(0x08, 0x0E);
         }
 
         HAL_Delay(200);
@@ -233,31 +137,7 @@ int main(void)
 }
 
 
-/* ================= SPI1 ================= */
 
-static void MX_SPI1_Init(void)
-{
-    hspi1.Instance = SPI1;
-    hspi1.Init.Mode = SPI_MODE_MASTER;
-    hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-    hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-    hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-    hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-    hspi1.Init.NSS = SPI_NSS_SOFT;
-    hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
-    hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-    hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-    hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-    hspi1.Init.CRCPolynomial = 10;
-
-    if (HAL_SPI_Init(&hspi1) != HAL_OK)
-    {
-        Error_Handler();
-    }
-}
-
-
-/* ================= UART1 ================= */
 
 static void MX_USART1_UART_Init(void)
 {
@@ -278,7 +158,7 @@ static void MX_USART1_UART_Init(void)
 }
 
 
-/* ================= I2C1 ================= */
+
 
 static void MX_I2C1_Init(void)
 {
@@ -300,30 +180,16 @@ static void MX_I2C1_Init(void)
 }
 
 
-/* ================= GPIO ================= */
+
 
 static void MX_GPIO_Init(void)
 {
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
-
-    GPIO_InitStruct.Pin = GPIO_PIN_4;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-    HAL_GPIO_WritePin(
-        GPIOA,
-        GPIO_PIN_4,
-        GPIO_PIN_SET
-    );
 }
 
 
-/* ================= UART MSP ================= */
+
 
 void HAL_UART_MspInit(UART_HandleTypeDef *huart)
 {
@@ -349,7 +215,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart)
 }
 
 
-/* ================= I2C MSP ================= */
+
 
 void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
 {
@@ -369,27 +235,7 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
 }
 
 
-/* ================= SPI MSP ================= */
 
-void HAL_SPI_MspInit(SPI_HandleTypeDef *hspi)
-{
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-    if (hspi->Instance == SPI1)
-    {
-        __HAL_RCC_SPI1_CLK_ENABLE();
-        __HAL_RCC_GPIOA_CLK_ENABLE();
-
-        GPIO_InitStruct.Pin = GPIO_PIN_5 | GPIO_PIN_7;
-        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-
-        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-    }
-}
-
-
-/* ================= CLOCK ================= */
 
 void SystemClock_Config(void)
 {
@@ -430,7 +276,6 @@ void SystemClock_Config(void)
 }
 
 
-/* ================= SYSTICK ================= */
 
 void SysTick_Handler(void)
 {
@@ -438,7 +283,6 @@ void SysTick_Handler(void)
 }
 
 
-/* ================= ERROR ================= */
 
 void Error_Handler(void)
 {

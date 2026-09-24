@@ -23,15 +23,11 @@ static void UART_Send_Button(void)
     if (uart_busy)
         return;
 
-    len = sprintf((char *)uart_tx_buffer,
-                  "B23DCDT03013:BTN:%lu\n\r",
-                  button_count);
+    len = sprintf((char *)uart_tx_buffer,"ELE1415-20261-03-Nhom13:BTN:%lu\n\r",button_count);
 
     uart_busy = 1;
 
-    if (HAL_UART_Transmit_DMA(&huart1,
-                              uart_tx_buffer,
-                              len) != HAL_OK)
+    if (HAL_UART_Transmit_DMA(&huart1,uart_tx_buffer,len) != HAL_OK)
     {
         uart_busy = 0;
     }
@@ -64,7 +60,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
         static uint32_t last_press = 0;
         uint32_t now = HAL_GetTick();
 
-        if ((now - last_press) >= 50)
+        if ((now - last_press) >= 350)
         {
             last_press = now;
 

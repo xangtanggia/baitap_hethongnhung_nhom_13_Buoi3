@@ -1,4 +1,4 @@
-TARGET = bai5
+TARGET = bai1
 
 CPU = cortex-m3
 MCU = STM32F103xB

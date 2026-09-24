@@ -30,22 +30,13 @@ void MAX7219_Write(uint8_t address, uint8_t data)
 
 void MAX7219_Init(void)
 {
-    /* Decode mode */
+
     MAX7219_Write(0x09, 0x0F);
-
-    /* Intensity */
     MAX7219_Write(0x0A, 0x08);
-
-    /* Scan limit: digit 0 -> digit 3 */
     MAX7219_Write(0x0B, 0x03);
-
-    /* Normal operation */
     MAX7219_Write(0x0C, 0x01);
-
-    /* Display test OFF */
     MAX7219_Write(0x0F, 0x00);
 
-    /* Xóa màn hình */
     MAX7219_Write(1, 0);
     MAX7219_Write(2, 0);
     MAX7219_Write(3, 0);
@@ -77,13 +68,9 @@ int main(void)
     uint16_t count = 0;
 
     HAL_Init();
-
     SystemClock_Config();
-
     MX_GPIO_Init();
-
     MX_SPI1_Init();
-
     MAX7219_Init();
 
     while (1)
@@ -94,7 +81,7 @@ int main(void)
 
         count++;
 
-        if (count > 3000)
+        if (count > 9999)
         {
             count = 0;
         }
@@ -176,21 +163,13 @@ static void MX_GPIO_Init(void)
 
     __HAL_RCC_GPIOA_CLK_ENABLE();
 
-    /*
-     * PA5 = SPI1_SCK
-     * PA7 = SPI1_MOSI
-     */
+
 
     GPIO_InitStruct.Pin = GPIO_PIN_5 | GPIO_PIN_7;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-
-    /*
-     * PA4 = CS
-     */
 
     GPIO_InitStruct.Pin = GPIO_PIN_4;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;

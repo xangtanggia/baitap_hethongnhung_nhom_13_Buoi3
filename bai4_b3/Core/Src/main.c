@@ -33,7 +33,9 @@ void UART_Send_Buffer(uint16_t start, uint16_t end)
 
     for (i = start; i < end; i++)
     {
-        pos += sprintf(&uart_tx_buffer[pos], "%u\n\r", adc_buffer[i]);
+        pos += sprintf(&uart_tx_buffer[pos],
+                       "%u\n\r",
+                       adc_buffer[i]);
     }
 
     uart_busy = 1;
