@@ -14,13 +14,11 @@ uint16_t adc_buffer[100];
 
 volatile uint8_t adc_half_ready = 0;
 volatile uint8_t adc_full_ready = 0;
-
 volatile uint8_t uart_busy = 0;
 
 char uart_tx_buffer[400];
 
 void SystemClock_Config(void);
-static void GPIO_Init(void);
 static void DMA_Init(void);
 static void ADC1_Init(void);
 static void TIM3_Init(void);
@@ -53,8 +51,6 @@ int main(void)
     HAL_Init();
 
     SystemClock_Config();
-
-    GPIO_Init();
     DMA_Init();
     ADC1_Init();
     TIM3_Init();
@@ -264,20 +260,7 @@ static void USART1_Init(void)
     }
 }
 
-static void GPIO_Init(void)
-{
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    __HAL_RCC_GPIOC_CLK_ENABLE();
-
-    GPIO_InitStruct.Pin = GPIO_PIN_13;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-
-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-}
 
 void SystemClock_Config(void)
 {
